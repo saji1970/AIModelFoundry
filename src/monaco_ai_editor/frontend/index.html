@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Monaco AI Editor</title>
+  <style>
+    #editor { width: 100%; height: 90vh; border: 1px solid grey; }
+    #chatWindow { padding: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Monaco Editor with AI Suggestions</h2>
+  <select id="modelSelect">
+    <option value="chatgpt">ChatGPT</option>
+    <option value="claude">Claude</option>
+    <option value="gemini">Gemini</option>
+  </select>
+  <div id="editor"></div>
+  <div id="chatWindow">
+    <textarea id="chatInput" rows="3" cols="80"></textarea><br>
+    <button onclick="sendToAI()">Ask AI</button>
+    <pre id="chatOutput"></pre>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.34.1/min/vs/loader.js"></script>
+  <script>
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.34.1/min/vs' }});
+    require(['vs/editor/editor.main'], function () {
+      const editor = monaco.editor.create(document.getElementById('editor'), {
+        value: "// Start typing here...",
+        language: "javascript"
+      });
+
+      monaco.languages.registerCompletionItemProvider('javascript', {
+        provideCompletionItems: async function(model, position) {
+          const text = model.getValue().slice(0, model.getOffsetAt(position));
+          const modelType = document.getElementById("modelSelect").value;
+          const res = await fetch("http://localhost:8000/api/ai-completion", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: text, model: modelType })
+          });
+          const data = await res.json();
+          return {
+            suggestions: [{
+              label: 'AI Suggestion',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: data.completion,
+              range: {
+                startLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column
+              }
+            }]
+          };
+        }
+      });
+    });
+
+    async function sendToAI() {
+      const prompt = document.getElementById("chatInput").value;
+      const modelType = document.getElementById("modelSelect").value;
+      const res = await fetch("http://localhost:8000/api/ai-completion", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt, model: modelType })
+      });
+      const data = await res.json();
+      document.getElementById("chatOutput").textContent = data.completion;
+    }
+  </script>
+</body>
+</html>
